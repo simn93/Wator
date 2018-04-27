@@ -1,0 +1,151 @@
+#!/bin/bash
+
+#	Nome : Simone
+#	Cognome : Schirinzi
+#	
+#	Programma : Wator
+#
+#	Si dichiara che il contenuto di questo file e' in ogni sua parte opera originale dell'autore.
+#
+#	Simone Schirinzi
+
+# Stampa un piccolo messaggio descrittivo dello script
+function helpecho
+{
+	>&2 echo "Benvenuto in watorscript."
+	>&2	echo "Per usare lo script inserisci come parametri:"
+	>&2 echo "1° : il file da controllare ( se sia un wator valido)."
+	>&2 echo "2° : il parametro -s per contare il numero di squali."
+	>&2 echo "2° : il parametro -f per contare il numero di pesci."
+	>&2 echo "Non inserire -s e -f contemporaneamente."
+	return 0
+}
+
+# Variabili contatore per il numero dei pesci e quello degli squali
+fishnumber=0
+sharknumber=0
+
+# Dato un file di input, controlla che sia valido.
+# Analizza il file riga per riga, controllando che
+#  contenga due numeri nelle prime due righe, 
+#  e i caratteri 'W', 'F' o 'S' nelle restanti.
+# Controlla anche che abbia nrow righe, e che ogni riga contenga ncol caratteri.
+# Allo stesso tempo conta i pesci e gli squali presenti.
+function testfile 
+{
+	exec 3< "$1"
+	
+	irow=0	
+
+	read -u 3 -e nrow
+	read -u 3 -e ncol
+	nrow=${nrow//"\n"/""}
+	ncol=${ncol//"\n"/""}
+
+	while read -u 3 -e line
+	do
+		irow=$((irow+1))
+		line=${line//" "/""}
+		
+		if [[ ${#line} != $ncol ]]
+		then
+			exec 3>&- ;
+			return 1;
+		fi
+
+		for ((i=0;i < ${#line};i++))
+		do
+			case "${line:$i:1}" in
+				"W")
+					#nope
+				;;
+				"S")
+					sharknumber=$((sharknumber+1))
+				;;
+				"F")
+					fishnumber=$((fishnumber+1))
+				;;
+				*)
+					exec 3>&-
+					return 1
+				;;
+			esac
+		done
+	done
+
+	if [ $irow != $nrow ]
+	then 
+		exec 3>&- ;
+		return 1;
+	fi
+
+	return 0
+}
+
+# Essendo i pesci e gli squali già contati nella funzione testfile,
+#  countsharkfish stampa solo questi valori.
+function countsharkfish # $1 file $2 -f o -s
+{
+	if [ "$2" == "-f" ] 
+	then
+		echo $fishnumber;
+	else
+		echo $sharknumber;
+	fi
+}
+
+case $# in
+	1) # Controllo il numero di argomenti. Se è uno solo, puo essere o un file o un --help.
+		case "$1" in
+			"--help") # Caso help
+				helpecho
+				exit 1
+			;;
+			*) # Caso file
+				if [ -f "$1" ] && testfile "$1"
+				then
+					>&2 echo "OK"
+					exit 0;
+				else # Caso errore
+					>&2 echo "NO"
+					exit 1;
+				fi
+			;;
+		esac
+	;;
+	2) # Ho due argomenti
+		case "$1" in # Il primo è un opzione
+			"-s"|"-f")
+				if [ -f "$2" ] && testfile "$2"
+				then
+					countsharkfish "$2" "$1";
+					exit 0;
+				else
+					exit 1;
+				fi
+			;;
+			*) # Il secondo è un opzione
+				if [ -f "$1" ] # Se il primo argomento non è -s o -f, allora deve essere un file
+				then
+					if testfile "$1" # Se è un file, allora deve essere ben formattato
+					then
+						if [[ "$2" == "-f" || "$2" == "-s" ]] # Se arrivo qui, allora il secondo argomento deve essere -f o -s
+						then
+							countsharkfish "$1" $2;
+							exit 0;
+						else # In ogni altro caso c'è un errore.
+							exit 1;
+						fi
+					else
+						exit 1;
+					fi
+				else
+					exit 1;
+				fi
+ 			;;
+		esac
+	;;
+	*)
+		exit 1;
+	;;
+esac	
